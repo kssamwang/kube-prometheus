@@ -1,14 +1,17 @@
 ---
-weight: 301
+weight: 500
 toc: true
 title: Deploy to kind
 menu:
     docs:
         parent: kube
-lead: This guide will help you deploying kube-prometheus on Kubernetes kind.
+lead: Deploy kube-prometheus to Kubernets kind.
 images: []
 draft: false
-description: This guide will help you deploying kube-prometheus on Kubernetes kind.
+description: Deploy kube-prometheus to Kubernets kind.
+date: "2021-03-08T23:04:32+01:00"
+---
+
 ---
 
 Time to explain how!

@@ -20,7 +20,7 @@ local defaults = {
       kubeApiserverSelector: 'job="apiserver"',
       podLabel: 'pod',
       runbookURLPattern: 'https://runbooks.prometheus-operator.dev/runbooks/kubernetes/%s',
-      diskDeviceSelector: 'device=~"(/dev/)?(mmcblk.p.+|nvme.+|rbd.+|sd.+|vd.+|xvd.+|dm-.+|md.+|dasd.+)"',
+      diskDeviceSelector: 'device=~"mmcblk.p.+|nvme.+|rbd.+|sd.+|vd.+|xvd.+|dm-.+|dasd.+"',
       hostNetworkInterfaceSelector: 'device!~"veth.+"',
     },
   },
@@ -37,14 +37,6 @@ function(params) {
 
   mixin:: (import 'github.com/kubernetes-monitoring/kubernetes-mixin/mixin.libsonnet') {
     _config+:: k8s._config.mixin._config,
-  } + {
-    // Filter-out alerts related to kube-proxy when `kubeProxy: false`
-    [if !(defaults + params).kubeProxy then 'prometheusAlerts']+:: {
-      groups: std.filter(
-        function(g) !std.member(['kubernetes-system-kube-proxy'], g.name),
-        super.groups
-      ),
-    },
   },
 
   prometheusRule: {
@@ -105,7 +97,6 @@ function(params) {
           bearerTokenFile: '/var/run/secrets/kubernetes.io/serviceaccount/token',
           metricRelabelings: relabelings,
           relabelings: [{
-            action: 'replace',
             sourceLabels: ['__metrics_path__'],
             targetLabel: 'metrics_path',
           }],
@@ -122,7 +113,6 @@ function(params) {
           },
           bearerTokenFile: '/var/run/secrets/kubernetes.io/serviceaccount/token',
           relabelings: [{
-            action: 'replace',
             sourceLabels: ['__metrics_path__'],
             targetLabel: 'metrics_path',
           }],
@@ -168,7 +158,6 @@ function(params) {
           tlsConfig: { insecureSkipVerify: true },
           bearerTokenFile: '/var/run/secrets/kubernetes.io/serviceaccount/token',
           relabelings: [{
-            action: 'replace',
             sourceLabels: ['__metrics_path__'],
             targetLabel: 'metrics_path',
           }],
@@ -291,6 +280,7 @@ function(params) {
       },
       podMetricsEndpoints: [{
         honorLabels: true,
+        targetPort: 10249,
         relabelings: [
           {
             action: 'replace',
@@ -298,13 +288,6 @@ function(params) {
             replacement: '$1',
             sourceLabels: ['__meta_kubernetes_pod_node_name'],
             targetLabel: 'instance',
-          },
-          {
-            action: 'replace',
-            regex: '(.*)',
-            replacement: '$1:10249',
-            targetLabel: '__address__',
-            sourceLabels: ['__meta_kubernetes_pod_ip'],
           },
         ],
       }],

@@ -61,8 +61,5 @@ function(params) {
     runAsUser: 65532,
     runAsGroup: 65532,
     runAsNonRoot: true,
-    allowPrivilegeEscalation: false,
-    readOnlyRootFilesystem: true,
-    capabilities: { drop: ['ALL'] },
   },
 }

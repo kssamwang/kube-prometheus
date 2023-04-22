@@ -16,7 +16,6 @@ local restrictedPodSecurityPolicy = {
       'configMap',
       'emptyDir',
       'secret',
-      'projected',
       // Assume that persistentVolumes set up by the cluster admin are safe to use.
       'persistentVolumeClaim',
     ],
@@ -200,9 +199,6 @@ local restrictedPodSecurityPolicy = {
         name: 'node-exporter-psp',
       },
       spec+: {
-        allowedCapabilities: [
-          'SYS_TIME',
-        ],
         allowedHostPaths+: [
           {
             pathPrefix: '/proc',

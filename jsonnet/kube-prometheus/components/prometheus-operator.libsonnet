@@ -15,12 +15,6 @@ local defaults = {
     limits: { cpu: '200m', memory: '200Mi' },
     requests: { cpu: '100m', memory: '100Mi' },
   },
-  kubeRbacProxy:: {
-    resources+: {
-      requests: { cpu: '10m', memory: '20Mi' },
-      limits: { cpu: '20m', memory: '40Mi' },
-    },
-  },
   commonLabels:: {
     'app.kubernetes.io/name': defaults.name,
     'app.kubernetes.io/version': defaults.version,
@@ -78,32 +72,6 @@ function(params)
       },
     },
 
-    networkPolicy: {
-      apiVersion: 'networking.k8s.io/v1',
-      kind: 'NetworkPolicy',
-      metadata: po.service.metadata,
-      spec: {
-        podSelector: {
-          matchLabels: po._config.selectorLabels,
-        },
-        policyTypes: ['Egress', 'Ingress'],
-        egress: [{}],
-        ingress: [{
-          from: [{
-            podSelector: {
-              matchLabels: {
-                'app.kubernetes.io/name': 'prometheus',
-              },
-            },
-          }],
-          ports: std.map(function(o) {
-            port: o.port,
-            protocol: 'TCP',
-          }, po.service.spec.ports),
-        }],
-      },
-    },
-
     service+: {
       spec+: {
         ports: [
@@ -147,7 +115,7 @@ function(params)
       ],
     },
 
-    local kubeRbacProxy = krp(po._config.kubeRbacProxy {
+    local kubeRbacProxy = krp({
       name: 'kube-rbac-proxy',
       upstream: 'http://127.0.0.1:8080/',
       secureListenAddress: ':8443',
@@ -161,7 +129,6 @@ function(params)
       spec+: {
         template+: {
           spec+: {
-            automountServiceAccountToken: true,
             containers+: [kubeRbacProxy],
           },
         },

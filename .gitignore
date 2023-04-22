@@ -4,7 +4,6 @@ vendor/
 ./auth
 .swp
 crdschemas/
-.mdoxcache
 
 developer-workspace/gitpod/_output
-developer-workspace/codespaces/kind 
+kind

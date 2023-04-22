@@ -1,14 +1,15 @@
 ---
-weight: 305
+weight: 640
 toc: true
 title: Monitoring external etcd
 menu:
     docs:
         parent: kube
-lead: This guide will help you monitoring an external etcd cluster.
+lead: This guide will help you monitor an external etcd cluster.
 images: []
 draft: false
-description: This guide will help you monitoring an external etcd cluster.
+description: This guide will help you monitor an external etcd cluster.
+date: "2021-03-08T23:04:32+01:00"
 ---
 
 When the etcd cluster is not hosted inside Kubernetes.

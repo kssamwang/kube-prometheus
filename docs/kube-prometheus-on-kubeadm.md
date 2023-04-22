@@ -1,14 +1,15 @@
 ---
-weight: 302
+weight: 500
 toc: true
 title: Deploy to kubeadm
 menu:
     docs:
         parent: kube
-lead: This guide will help you deploying kube-prometheus on Kubernetes kubeadm.
+lead: Deploy kube-prometheus to Kubernets kubeadm.
 images: []
 draft: false
-description: This guide will help you deploying kube-prometheus on Kubernetes kubeadm.
+description: Deploy kube-prometheus to Kubernets kubeadm.
+date: "2021-03-08T23:04:32+01:00"
 ---
 
 The [kubeadm](https://kubernetes.io/docs/setup/independent/create-cluster-kubeadm/) tool is linked by Kubernetes as the offical way to deploy and manage self-hosted clusters. kubeadm does a lot of heavy lifting by automatically configuring your Kubernetes cluster with some common options. This guide is intended to show you how to deploy Prometheus, Prometheus Operator and Kube Prometheus to get you started monitoring your cluster that was deployed with kubeadm.
@@ -22,39 +23,55 @@ This guide assumes you have some familiarity with `kubeadm` or at least have dep
 By default, `kubeadm` runs these pods on your master and bound to `127.0.0.1`. There are a couple of ways to change this. The recommended way to change these features is to use the [kubeadm config file](https://kubernetes.io/docs/reference/generated/kubeadm/#config-file). An example configuration file can be used:
 
 ```yaml
-apiVersion: kubeadm.k8s.io/v1beta2
-kind: ClusterConfiguration
-controlPlaneEndpoint: "192.168.1.173:6443"
-apiServer:
-  extraArgs:
-    authorization-mode: "Node,RBAC"
-controllerManager:
-  extraArgs:
-    bind-address: "0.0.0.0"
-scheduler:
-  extraArgs:
-    bind-address: "0.0.0.0"
-certificatesDir: "/etc/kubernetes/pki"
+apiVersion: kubeadm.k8s.io/v1alpha1
+kind: MasterConfiguration
+api:
+  advertiseAddress: 192.168.1.173
+  bindPort: 6443
+authorizationModes:
+- Node
+- RBAC
+certificatesDir: /etc/kubernetes/pki
+cloudProvider:
 etcd:
-  # one of local or external
-  local:
-    dataDir: "/var/lib/etcd"
-kubernetesVersion: "v1.23.1"
+  dataDir: /var/lib/etcd
+  endpoints: null
+imageRepository: gcr.io/google_containers
+kubernetesVersion: v1.8.3
 networking:
-  dnsDomain: "cluster.local"
-  serviceSubnet: "10.96.0.0/12"
-imageRepository: "registry.k8s.io"
+  dnsDomain: cluster.local
+  serviceSubnet: 10.96.0.0/12
+nodeName: your-dev
+tokenTTL: 24h0m0s
+controllerManagerExtraArgs:
+  address: 0.0.0.0
+schedulerExtraArgs:
+  address: 0.0.0.0
 ```
 
-Notice the `.scheduler.extraArgs` and `.controllerManager.extraArgs`. This exposes the `kube-controller-manager` and `kube-scheduler` services to the rest of the cluster. If you have kubernetes core components as pods in the kube-system namespace, ensure that the `kube-prometheus-exporter-kube-scheduler` and `kube-prometheus-exporter-kube-controller-manager` services' `spec.selector` values match those of pods.
+Notice the `schedulerExtraArgs` and `controllerManagerExtraArgs`. This exposes the `kube-controller-manager` and `kube-scheduler` services to the rest of the cluster. If you have kubernetes core components as pods in the kube-system namespace, ensure that the `kube-prometheus-exporter-kube-scheduler` and `kube-prometheus-exporter-kube-controller-manager` services' `spec.selector` values match those of pods.
 
-In previous versions of Kubernetes, we had to make a change to the `kubelet` setting with regard to `cAdvisor` monitoring on the control-plane as well as all the nodes. But this is **no longer required due to [the change of Kubernetes](https://github.com/kubernetes/kubernetes/issues/56523)**.
+In addition, we will be using `node-exporter` to monitor the `cAdvisor` service on all the nodes. This, however requires a change to the `kubelet` service on the master as well as all the nodes. According to the Kubernetes documentation
+
+> The kubeadm deb package ships with configuration for how the kubelet should be run. Note that the `kubeadm` CLI command will never touch this drop-in file. This drop-in file belongs to the kubeadm deb/rpm package.
+
+Again, we need to expose the `cadvisor` that is installed and managed by the `kubelet` daemon and allow webhook token authentication. To do so, we do the following on all the masters and nodes:
+
+```bash
+KUBEADM_SYSTEMD_CONF=/etc/systemd/system/kubelet.service.d/10-kubeadm.conf
+sed -e "/cadvisor-port=0/d" -i "$KUBEADM_SYSTEMD_CONF"
+if ! grep -q "authentication-token-webhook=true" "$KUBEADM_SYSTEMD_CONF"; then
+  sed -e "s/--authorization-mode=Webhook/--authentication-token-webhook=true --authorization-mode=Webhook/" -i "$KUBEADM_SYSTEMD_CONF"
+fi
+systemctl daemon-reload
+systemctl restart kubelet
+```
 
 In case you already have a Kubernetes deployed with kubeadm, change the address kube-controller-manager and kube-scheduler listens in addition to previous kubelet change:
 
 ```
-sed -e "s/- --bind-address=127.0.0.1/- --bind-address=0.0.0.0/" -i /etc/kubernetes/manifests/kube-controller-manager.yaml
-sed -e "s/- --bind-address=127.0.0.1/- --bind-address=0.0.0.0/" -i /etc/kubernetes/manifests/kube-scheduler.yaml
+sed -e "s/- --address=127.0.0.1/- --address=0.0.0.0/" -i /etc/kubernetes/manifests/kube-controller-manager.yaml
+sed -e "s/- --address=127.0.0.1/- --address=0.0.0.0/" -i /etc/kubernetes/manifests/kube-scheduler.yaml
 ```
 
 With these changes, your Kubernetes cluster is ready.

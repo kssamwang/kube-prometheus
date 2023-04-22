@@ -77,13 +77,9 @@
       apiVersion: 'monitoring.coreos.com/v1',
       kind: 'PrometheusRule',
       metadata: {
-        labels: {
-          'app.kubernetes.io/name': 'prometheus-vpc-cni-rules',
-          'app.kubernetes.io/component': 'prometheus',
-          'app.kubernetes.io/part-of': 'kube-prometheus',
-        },
+        labels: $.prometheus._config.commonLabels + $.prometheus._config.mixin.ruleLabels,
         name: 'aws-vpc-cni-rules',
-        namespace: $.values.prometheus.namespace,
+        namespace: $.prometheus._config.namespace,
       },
       spec: {
         groups: [

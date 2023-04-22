@@ -31,27 +31,22 @@ local defaults = {
     nodeExporter: '4m',
     windowsExporter: '4m',
   },
-  containerMetricsPrefix:: '',
 
   prometheusURL:: error 'must provide prometheusURL',
-  containerQuerySelector:: '',
-  nodeQuerySelector:: '',
   config:: {
-    local containerSelector = if $.containerQuerySelector != '' then ',' + $.containerQuerySelector else '',
-    local nodeSelector = if $.nodeQuerySelector != '' then ',' + $.nodeQuerySelector else '',
     resourceRules: {
       cpu: {
         containerQuery: |||
           sum by (<<.GroupBy>>) (
             irate (
-                %(containerMetricsPrefix)scontainer_cpu_usage_seconds_total{<<.LabelMatchers>>,container!="",pod!=""%(addtionalSelector)s}[%(kubelet)s]
+                container_cpu_usage_seconds_total{<<.LabelMatchers>>,container!="",pod!=""}[%(kubelet)s]
             )
           )
-        ||| % { kubelet: $.rangeIntervals.kubelet, containerMetricsPrefix: $.containerMetricsPrefix, addtionalSelector: containerSelector },
+        ||| % $.rangeIntervals,
         nodeQuery: |||
           sum by (<<.GroupBy>>) (
             1 - irate(
-              node_cpu_seconds_total{mode="idle"%(addtionalSelector)s}[%(nodeExporter)s]
+              node_cpu_seconds_total{mode="idle"}[%(nodeExporter)s]
             )
             * on(namespace, pod) group_left(node) (
               node_namespace_pod:kube_pod_info:{<<.LabelMatchers>>}
@@ -59,10 +54,10 @@ local defaults = {
           )
           or sum by (<<.GroupBy>>) (
             1 - irate(
-              windows_cpu_time_total{mode="idle", job="windows-exporter",<<.LabelMatchers>>%(addtionalSelector)s}[%(windowsExporter)s]
+              windows_cpu_time_total{mode="idle", job="windows-exporter",<<.LabelMatchers>>}[%(windowsExporter)s]
             )
           )
-        ||| % { nodeExporter: $.rangeIntervals.nodeExporter, windowsExporter: $.rangeIntervals.windowsExporter, containerMetricsPrefix: $.containerMetricsPrefix, addtionalSelector: nodeSelector },
+        ||| % $.rangeIntervals,
         resources: {
           overrides: {
             node: { resource: 'node' },
@@ -75,21 +70,21 @@ local defaults = {
       memory: {
         containerQuery: |||
           sum by (<<.GroupBy>>) (
-            %(containerMetricsPrefix)scontainer_memory_working_set_bytes{<<.LabelMatchers>>,container!="",pod!=""%(addtionalSelector)s}
+            container_memory_working_set_bytes{<<.LabelMatchers>>,container!="",pod!=""}
           )
-        ||| % { containerMetricsPrefix: $.containerMetricsPrefix, addtionalSelector: containerSelector },
+        |||,
         nodeQuery: |||
           sum by (<<.GroupBy>>) (
-            node_memory_MemTotal_bytes{job="node-exporter",<<.LabelMatchers>>%(addtionalSelector)s}
+            node_memory_MemTotal_bytes{job="node-exporter",<<.LabelMatchers>>}
             -
-            node_memory_MemAvailable_bytes{job="node-exporter",<<.LabelMatchers>>%(addtionalSelector)s}
+            node_memory_MemAvailable_bytes{job="node-exporter",<<.LabelMatchers>>}
           )
           or sum by (<<.GroupBy>>) (
-            windows_cs_physical_memory_bytes{job="windows-exporter",<<.LabelMatchers>>%(addtionalSelector)s}
+            windows_cs_physical_memory_bytes{job="windows-exporter",<<.LabelMatchers>>}
             -
-            windows_memory_available_bytes{job="windows-exporter",<<.LabelMatchers>>%(addtionalSelector)s}
+            windows_memory_available_bytes{job="windows-exporter",<<.LabelMatchers>>}
           )
-        ||| % { containerMetricsPrefix: $.containerMetricsPrefix, addtionalSelector: nodeSelector },
+        |||,
         resources: {
           overrides: {
             instance: { resource: 'node' },
@@ -211,21 +206,6 @@ function(params) {
     },
   },
 
-  networkPolicy: {
-    apiVersion: 'networking.k8s.io/v1',
-    kind: 'NetworkPolicy',
-    metadata: pa.service.metadata,
-    spec: {
-      podSelector: {
-        matchLabels: pa._config.selectorLabels,
-      },
-      policyTypes: ['Egress', 'Ingress'],
-      egress: [{}],
-      // Prometheus-adapter needs ingress allowed so HPAs can request metrics from it.
-      ingress: [{}],
-    },
-  },
-
   deployment:
     local c = {
       name: pa._config.name,
@@ -240,44 +220,12 @@ function(params) {
         '--tls-cipher-suites=' + std.join(',', pa._config.tlsCipherSuites),
       ],
       resources: pa._config.resources,
-      startupProbe: {
-        httpGet: {
-          path: '/livez',
-          port: 'https',
-          scheme: 'HTTPS',
-        },
-        periodSeconds: 10,
-        failureThreshold: 18,
-      },
-      readinessProbe: {
-        httpGet: {
-          path: '/readyz',
-          port: 'https',
-          scheme: 'HTTPS',
-        },
-        periodSeconds: 5,
-        failureThreshold: 5,
-      },
-      livenessProbe: {
-        httpGet: {
-          path: '/livez',
-          port: 'https',
-          scheme: 'HTTPS',
-        },
-        periodSeconds: 5,
-        failureThreshold: 5,
-      },
-      ports: [{ containerPort: 6443, name: 'https' }],
+      ports: [{ containerPort: 6443 }],
       volumeMounts: [
         { name: 'tmpfs', mountPath: '/tmp', readOnly: false },
         { name: 'volume-serving-cert', mountPath: '/var/run/serving-cert', readOnly: false },
         { name: 'config', mountPath: '/etc/adapter', readOnly: false },
       ],
-      securityContext: {
-        allowPrivilegeEscalation: false,
-        readOnlyRootFilesystem: true,
-        capabilities: { drop: ['ALL'] },
-      },
     };
 
     {
@@ -300,7 +248,6 @@ function(params) {
           spec: {
             containers: [c],
             serviceAccountName: $.serviceAccount.metadata.name,
-            automountServiceAccountToken: true,
             nodeSelector: { 'kubernetes.io/os': 'linux' },
             volumes: [
               { name: 'tmpfs', emptyDir: {} },
@@ -316,7 +263,6 @@ function(params) {
     apiVersion: 'v1',
     kind: 'ServiceAccount',
     metadata: pa._metadata,
-    automountServiceAccountToken: false,
   },
 
   clusterRole: {

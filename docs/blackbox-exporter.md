@@ -1,14 +1,15 @@
 ---
-weight: 304
+weight: 630
 toc: true
 title: Blackbox Exporter
 menu:
     docs:
         parent: kube
-lead: This guide will help you deploying the blackbox-exporter with the Probe custom resource definition.
+lead: This Document documents the types introduced by the Prometheus Operator to be consumed by users.
+lastmod: "2021-03-08T08:49:31+00:00"
 images: []
 draft: false
-description: This guide will help you deploying the blackbox-exporter with the Probe custom resource definition.
+description: Generated API docs for the Prometheus Operator
 date: "2021-03-08T08:49:31+00:00"
 ---
 

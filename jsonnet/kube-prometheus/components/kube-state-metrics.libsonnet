@@ -20,12 +20,6 @@ local defaults = {
       requests+: { cpu: '20m' },
     },
   },
-  kubeRbacProxySelf:: {
-    resources+: {
-      limits+: { cpu: '20m' },
-      requests+: { cpu: '10m' },
-    },
-  },
   scrapeInterval:: '30s',
   scrapeTimeout:: '30s',
   commonLabels:: {
@@ -114,7 +108,7 @@ function(params) (import 'github.com/kubernetes/kube-state-metrics/jsonnet/kube-
     image: ksm._config.kubeRbacProxyImage,
   }),
 
-  local kubeRbacProxySelf = krp(ksm._config.kubeRbacProxySelf {
+  local kubeRbacProxySelf = krp({
     name: 'kube-rbac-proxy-self',
     upstream: 'http://127.0.0.1:8082/',
     secureListenAddress: ':9443',
@@ -123,32 +117,6 @@ function(params) (import 'github.com/kubernetes/kube-state-metrics/jsonnet/kube-
     ],
     image: ksm._config.kubeRbacProxyImage,
   }),
-
-  networkPolicy: {
-    apiVersion: 'networking.k8s.io/v1',
-    kind: 'NetworkPolicy',
-    metadata: ksm.service.metadata,
-    spec: {
-      podSelector: {
-        matchLabels: ksm._config.selectorLabels,
-      },
-      policyTypes: ['Egress', 'Ingress'],
-      egress: [{}],
-      ingress: [{
-        from: [{
-          podSelector: {
-            matchLabels: {
-              'app.kubernetes.io/name': 'prometheus',
-            },
-          },
-        }],
-        ports: std.map(function(o) {
-          port: o.port,
-          protocol: 'TCP',
-        }, ksm.service.spec.ports),
-      }],
-    },
-  },
 
   deployment+: {
     spec+: {
@@ -159,7 +127,6 @@ function(params) (import 'github.com/kubernetes/kube-state-metrics/jsonnet/kube-
           },
         },
         spec+: {
-          automountServiceAccountToken: true,
           containers: std.map(function(c) c {
             ports:: null,
             livenessProbe:: null,
@@ -193,14 +160,6 @@ function(params) (import 'github.com/kubernetes/kube-state-metrics/jsonnet/kube-
               {
                 regex: '(pod|service|endpoint|namespace)',
                 action: 'labeldrop',
-              },
-            ],
-            metricRelabelings: [
-              {
-                // Dropping metric deprecated from kube-state-metrics 2.6.0 version
-                sourceLabels: ['__name__'],
-                regex: 'kube_endpoint_address_not_ready|kube_endpoint_address_available',
-                action: 'drop',
               },
             ],
             tlsConfig: {
