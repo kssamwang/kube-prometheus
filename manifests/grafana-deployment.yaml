@@ -30,6 +30,7 @@ spec:
       containers:
       - env: []
         image: grafana/grafana:8.3.3
+        imagePullPolicy: IfNotPresent
         name: grafana
         ports:
         - containerPort: 3000
